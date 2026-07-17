@@ -23,6 +23,8 @@
 
 - iTerm2 ≥ 3.5（multipart 支持）
 - Neovim ≥ 0.10（`vim.base64`）
+- ImageMagick（可选，仅 GIF 需要）：GIF 只渲染首帧——动图整体发给 iTerm2
+  会触发全帧解码与循环播放，大文件足以卡死终端；未安装 magick 时 GIF 跳过渲染
 
 安装后可用 `:checkhealth iterm-image` 自检环境。
 

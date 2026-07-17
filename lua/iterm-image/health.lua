@@ -16,6 +16,12 @@ function Health.check()
     h.error("需要 Neovim 0.10+（依赖 vim.base64）")
   end
 
+  if vim.fn.executable("magick") == 1 then
+    h.ok("ImageMagick 可用（GIF 首帧渲染）")
+  else
+    h.warn("未找到 magick，GIF 将无法渲染", { "brew install imagemagick" })
+  end
+
   if not Terminal.is_iterm2() then
     h.error(
       "未检测到 iTerm2（TERM_PROGRAM / LC_TERMINAL）",

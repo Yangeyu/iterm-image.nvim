@@ -65,6 +65,51 @@ local function read_file(path, max_size, on_done)
   end)
 end
 
+-- GIF 只渲染首帧：把动图整体发给 iTerm2 会触发全帧解码与循环播放，
+-- 大文件足以卡死整个终端；改用 ImageMagick 抽取第一帧转成静态 PNG。
+-- 首帧结果按 路径+mtime 缓存，补画时不必重跑子进程。
+---@type { path: string, mtime: integer, data: string }?
+local gif_frame_cache = nil
+
+---@param path string
+---@return boolean
+local function is_gif(path)
+  return path:lower():sub(-4) == ".gif"
+end
+
+---@param path string
+---@param on_done fun(data: string?, err: string?)
+local function extract_gif_first_frame(path, on_done)
+  local stat = uv.fs_stat(path)
+  local mtime = stat and stat.mtime.sec or -1
+  if gif_frame_cache and gif_frame_cache.path == path and gif_frame_cache.mtime == mtime then
+    return on_done(gif_frame_cache.data)
+  end
+  if vim.fn.executable("magick") ~= 1 then
+    return on_done(nil, "渲染 GIF 首帧需要 ImageMagick（brew install imagemagick）")
+  end
+  vim.system({ "magick", path .. "[0]", "png:-" }, { text = false }, function(result)
+    vim.schedule(function()
+      if result.code ~= 0 or not result.stdout or #result.stdout == 0 then
+        return on_done(nil, "GIF 首帧提取失败: " .. path)
+      end
+      gif_frame_cache = { path = path, mtime = mtime, data = result.stdout }
+      on_done(result.stdout)
+    end)
+  end)
+end
+
+--- 取得待渲染的图片字节：静态图直接读文件，GIF 抽取首帧
+---@param path string
+---@param max_size integer
+---@param on_done fun(data: string?, err: string?)
+local function load_image(path, max_size, on_done)
+  if is_gif(path) then
+    return extract_gif_first_frame(path, on_done)
+  end
+  read_file(path, max_size, on_done)
+end
+
 --- 异步渲染窗口中的图片；读取完成后校验现场（窗口、buffer、几何）仍有效才绘制
 ---@param win integer
 function Renderer.render(win)
@@ -76,7 +121,7 @@ function Renderer.render(win)
   if not path or not viewport(win) then
     return
   end
-  read_file(path, Config.options.max_file_size, function(data, err)
+  load_image(path, Config.options.max_file_size, function(data, err)
     if not data then
       vim.notify_once("iterm-image: " .. err, vim.log.levels.WARN)
       return
