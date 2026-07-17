@@ -14,6 +14,9 @@ local WINDOW_OPTS = {
   signcolumn = "no",
   wrap = false,
   fillchars = "eob: ",
+  -- 活动/非活动窗口共用同一高亮：焦点切换时 nvim 无需以 NormalNC 重绘
+  -- 本窗口，画在字符单元上的图片就不会被擦掉（擦掉再补画会造成闪烁）
+  winhighlight = "NormalNC:Normal",
 }
 
 ---@type table<integer, table<string, any>> winid -> 覆盖前的选项原值

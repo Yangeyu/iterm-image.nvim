@@ -95,8 +95,9 @@ end
 local pending = false
 local want_clear = false
 
---- 刷新所有可见图片。clear = true 时先整屏重绘，清掉终端上的旧图。
----@param opts? { clear?: boolean }
+--- 刷新所有可见图片。clear = true 时先整屏重绘，清掉终端上的旧图；
+--- delay 可覆盖默认防抖延迟（毫秒），用于需要尽快补画的场景。
+---@param opts? { clear?: boolean, delay?: integer }
 function Renderer.refresh(opts)
   want_clear = want_clear or (opts ~= nil and opts.clear == true)
   if pending then
@@ -113,7 +114,7 @@ function Renderer.refresh(opts)
     for _, win in ipairs(Buffer.windows()) do
       Renderer.render(win)
     end
-  end, Config.options.debounce_ms)
+  end, (opts and opts.delay) or Config.options.debounce_ms)
 end
 
 return Renderer

@@ -87,7 +87,7 @@ function M.setup(opts)
       if #Buffer.windows() == 0 then
         return
       end
-      Renderer.refresh({ clear = false })
+      Renderer.refresh({ clear = false, delay = 10 })
       vim.defer_fn(function()
         if #Buffer.windows() > 0 then
           Renderer.refresh({ clear = false })
