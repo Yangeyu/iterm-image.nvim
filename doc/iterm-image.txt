@@ -1,0 +1,72 @@
+*iterm-image.txt*        在 iTerm2 中查看图片        *iterm-image* *iterm-image.nvim*
+
+==============================================================================
+目录                                                    *iterm-image-contents*
+
+  1. 简介 ......................................... |iterm-image-introduction|
+  2. 要求 ......................................... |iterm-image-requirements|
+  3. 安装与配置 ................................... |iterm-image-setup|
+  4. 命令 ......................................... |iterm-image-commands|
+  5. 工作原理 ..................................... |iterm-image-how-it-works|
+
+==============================================================================
+1. 简介                                             *iterm-image-introduction*
+
+iterm-image.nvim 是专为 iTerm2 定制的图片查看器。打开图片文件
+（png/jpg/gif/webp 等）时，用 iTerm2 原生图片协议（OSC 1337）把图片
+渲染在窗口内容区域内。
+
+==============================================================================
+2. 要求                                             *iterm-image-requirements*
+
+- iTerm2 ≥ 3.5（multipart 图片传输）
+- Neovim ≥ 0.10（|vim.base64|）
+
+可用 `:checkhealth iterm-image` 自检环境。
+
+==============================================================================
+3. 安装与配置                                              *iterm-image-setup*
+
+lazy.nvim: >lua
+  {
+    "Yangeyu/iterm-image.nvim",
+    config = function()
+      require("iterm-image").setup()
+    end,
+  }
+<
+setup() 可选配置项及默认值：                          *iterm-image-config*
+>lua
+  require("iterm-image").setup({
+    -- 接管的文件通配符
+    patterns = { "*.png", "*.jpg", "*.jpeg", "*.gif",
+                 "*.webp", "*.bmp", "*.tiff", "*.ico" },
+    -- 图片与窗口边缘的间距（单位：字符格）
+    margin = { top = 1, right = 2, bottom = 2, left = 2 },
+    -- 每条 FilePart 序列携带的 base64 字符数
+    chunk_size = 2048,
+    -- 超过此字节数的文件不渲染
+    max_file_size = 20 * 1024 * 1024,
+    -- 刷新防抖窗口（毫秒）
+    debounce_ms = 60,
+  })
+<
+==============================================================================
+4. 命令                                                 *iterm-image-commands*
+
+:ItermImageRefresh                                        *:ItermImageRefresh*
+    清屏并重新渲染所有可见图片。画面异常时的手动兜底。
+
+==============================================================================
+5. 工作原理                                         *iterm-image-how-it-works*
+
+iTerm2 对 Kitty 图形协议的实现不完整（切换图片时旧图残留堆叠），
+外部进程方案（ueberzugpp）则会与 nvim 争写终端导致转义序列撕裂、
+满屏乱码。本插件因此：
+
+1. 使用 iTerm2 原生协议：图片画进字符单元，nvim 重绘即覆盖，无残留；
+2. 使用 multipart 分块传输（MultipartFile/FilePart/FileEnd）：每块都是
+   一条完整的小转义序列，与 nvim 输出交错也不会损坏；
+3. 由 nvim 进程内经 |v:stderr| 通道写终端，不开外部进程抢 tty。
+
+vim:tw=78:ts=8:noet:ft=help:norl:
