@@ -33,6 +33,9 @@ function Buffer.attach(buf, file)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "" })
   vim.bo[buf].modifiable = false
   vim.bo[buf].modified = false
+  -- 独立 filetype：便于 statusline 识别，也便于用户为图片 buffer 单独
+  -- 关闭会重绘窗口内容的插件（如光标拖尾动画）
+  vim.bo[buf].filetype = "iterm-image"
   vim.b[buf][BUF_VAR] = vim.fn.fnamemodify(file, ":p")
 end
 
