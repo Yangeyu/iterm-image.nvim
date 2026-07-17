@@ -76,6 +76,26 @@ function M.setup(opts)
     end,
   })
 
+  -- 焦点切换会重绘图片窗口（NormalNC 高亮、光标动画等），把画在字符单元上的
+  -- 图片抹掉；切换完成后补画一次（不清屏，直接覆盖绘制，避免闪烁）。
+  -- 光标动画类插件（如 smear-cursor）的拖尾会持续数百毫秒，可能在首次补画后
+  -- 再次擦掉部分图片，故延迟后再补画一轮兜底
+  vim.api.nvim_create_autocmd("WinEnter", {
+    group = group,
+    desc = "窗口切换后补画图片",
+    callback = function()
+      if #Buffer.windows() == 0 then
+        return
+      end
+      Renderer.refresh({ clear = false })
+      vim.defer_fn(function()
+        if #Buffer.windows() > 0 then
+          Renderer.refresh({ clear = false })
+        end
+      end, 400)
+    end,
+  })
+
   vim.api.nvim_create_user_command("ItermImageRefresh", M.refresh, {
     desc = "清屏并重新渲染图片",
   })
