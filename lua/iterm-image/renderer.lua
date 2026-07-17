@@ -67,48 +67,15 @@ end
 
 --- 异步渲染窗口中的图片；读取完成后校验现场（窗口、buffer、几何）仍有效才绘制
 ---@param win integer
--- 最近一次渲染的成品缓存。补画（被外部 redraw 擦掉后重现）是高频路径，
--- 命中缓存时跳过读文件与 base64 编码，同步重发序列，把擦除到重现的
--- 间隙压到最小以避免可感知的闪烁。
----@type { path: string, mtime: integer, geometry: ItermImage.Geometry, writes: string[] }?
-local last_render = nil
-
----@param a ItermImage.Geometry
----@param b ItermImage.Geometry
----@return boolean
-local function geometry_equal(a, b)
-  return a.row == b.row and a.col == b.col and a.width == b.width and a.height == b.height
-end
-
----@param path string
----@return integer? mtime 文件修改时间（秒）；stat 失败返回 nil
-local function file_mtime(path)
-  local stat = uv.fs_stat(path)
-  return stat and stat.mtime.sec or nil
-end
-
 function Renderer.render(win)
   if not (Terminal.is_iterm2() and vim.api.nvim_win_is_valid(win)) then
     return
   end
   local buf = vim.api.nvim_win_get_buf(win)
   local path = Buffer.path(buf)
-  local geometry = viewport(win)
-  if not path or not geometry then
+  if not path or not viewport(win) then
     return
   end
-
-  local mtime = file_mtime(path)
-  if
-    last_render
-    and last_render.path == path
-    and last_render.mtime == mtime
-    and geometry_equal(last_render.geometry, geometry)
-  then
-    Terminal.write(last_render.writes)
-    return
-  end
-
   read_file(path, Config.options.max_file_size, function(data, err)
     if not data then
       vim.notify_once("iterm-image: " .. err, vim.log.levels.WARN)
@@ -117,18 +84,10 @@ function Renderer.render(win)
     if not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then
       return
     end
-    local fresh_geometry = viewport(win)
-    if not fresh_geometry then
-      return
+    local geometry = viewport(win)
+    if geometry then
+      Terminal.write(Protocol.multipart(data, geometry, Config.options.chunk_size))
     end
-    local writes = Protocol.multipart(data, fresh_geometry, Config.options.chunk_size)
-    last_render = {
-      path = path,
-      mtime = mtime,
-      geometry = fresh_geometry,
-      writes = writes,
-    }
-    Terminal.write(writes)
   end)
 end
 
@@ -136,9 +95,8 @@ end
 local pending = false
 local want_clear = false
 
---- 刷新所有可见图片。clear = true 时先整屏重绘，清掉终端上的旧图；
---- delay 可覆盖默认防抖延迟（毫秒），用于需要尽快补画的场景。
----@param opts? { clear?: boolean, delay?: integer }
+--- 刷新所有可见图片。clear = true 时先整屏重绘，清掉终端上的旧图。
+---@param opts? { clear?: boolean }
 function Renderer.refresh(opts)
   want_clear = want_clear or (opts ~= nil and opts.clear == true)
   if pending then
@@ -155,7 +113,7 @@ function Renderer.refresh(opts)
     for _, win in ipairs(Buffer.windows()) do
       Renderer.render(win)
     end
-  end, (opts and opts.delay) or Config.options.debounce_ms)
+  end, Config.options.debounce_ms)
 end
 
 return Renderer

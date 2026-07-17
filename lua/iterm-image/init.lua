@@ -76,10 +76,10 @@ function M.setup(opts)
     end,
   })
 
-  -- 部分插件（如 nvim-tree 聚焦刷新）会主动调用 redraw，属全屏级重绘，
-  -- 任何窗口选项都防不住图片被擦；只能在窗口切换后尽快补画。
-  -- 补画走 renderer 的成品缓存，同步重发已编码序列，间隙小到无感。
-  -- 400ms 的第二轮兜底覆盖光标动画等持续性重绘结束后的残缺。
+  -- 焦点切换会重绘图片窗口（NormalNC 高亮、光标动画等），把画在字符单元上的
+  -- 图片抹掉；切换完成后补画一次（不清屏，直接覆盖绘制，避免闪烁）。
+  -- 光标动画类插件（如 smear-cursor）的拖尾会持续数百毫秒，可能在首次补画后
+  -- 再次擦掉部分图片，故延迟后再补画一轮兜底
   vim.api.nvim_create_autocmd("WinEnter", {
     group = group,
     desc = "窗口切换后补画图片",
@@ -87,7 +87,7 @@ function M.setup(opts)
       if #Buffer.windows() == 0 then
         return
       end
-      Renderer.refresh({ clear = false, delay = 10 })
+      Renderer.refresh({ clear = false })
       vim.defer_fn(function()
         if #Buffer.windows() > 0 then
           Renderer.refresh({ clear = false })
